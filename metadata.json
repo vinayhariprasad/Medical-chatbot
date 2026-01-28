@@ -1,0 +1,9 @@
+{
+  "name": "MediGenie AI",
+  "description": "A comprehensive end-to-end medical chatbot and health assistant utilizing Gemini 3 for advanced reasoning, image analysis, and real-time voice consultations.",
+  "requestFramePermissions": [
+    "camera",
+    "microphone",
+    "geolocation"
+  ]
+}
