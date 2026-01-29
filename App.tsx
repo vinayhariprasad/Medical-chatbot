@@ -7,6 +7,7 @@ import LiveInterface from './components/LiveInterface';
 import MedicalDashboard from './components/MedicalDashboard';
 import Sidebar from './components/Sidebar';
 import Disclaimer from './components/Disclaimer';
+import MedicalHistory from './components/MedicalHistory';
 
 const App: React.FC = () => {
   const [activeView, setActiveView] = useState<AppView>(AppView.DASHBOARD);
@@ -33,7 +34,7 @@ const App: React.FC = () => {
       case AppView.DASHBOARD:
         return <MedicalDashboard />;
       case AppView.HISTORY:
-        return <div className="p-8 text-center text-slate-500">History feature coming soon...</div>;
+        return <MedicalHistory />;
       default:
         return <MedicalDashboard />;
     }
@@ -58,7 +59,7 @@ const App: React.FC = () => {
         </main>
         
         {/* Mobile Navigation Bar */}
-        <div className="md:hidden glass-effect border-t border-slate-200 p-2 flex justify-around items-center sticky bottom-0">
+        <div className="md:hidden glass-effect border-t border-slate-200 p-2 flex justify-around items-center sticky bottom-0 z-30">
           <button 
             onClick={() => setActiveView(AppView.DASHBOARD)}
             className={`flex flex-col items-center p-2 rounded-lg ${activeView === AppView.DASHBOARD ? 'text-blue-600' : 'text-slate-400'}`}

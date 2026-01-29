@@ -3,11 +3,19 @@ export interface Message {
   role: 'user' | 'model';
   content: string;
   image?: string;
-  timestamp: Date;
+  timestamp: string | Date; // String for JSON compatibility, Date for runtime
   sources?: Array<{
     title: string;
     uri: string;
   }>;
+}
+
+export interface AnalysisReport {
+  id: string;
+  date: string;
+  summary: string;
+  fullContent: string;
+  image?: string;
 }
 
 export interface HealthMetric {

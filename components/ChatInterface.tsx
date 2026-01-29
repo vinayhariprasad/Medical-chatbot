@@ -3,10 +3,11 @@ import React, { useState, useRef, useEffect } from 'react';
 import { Message } from '../types';
 import { chatWithSearch, analyzeSymptomImage } from '../services/geminiService';
 
+const STORAGE_KEY = 'medigenie_chat_history';
+
 const MessageRenderer: React.FC<{ content: string; role: 'user' | 'model' }> = ({ content, role }) => {
   if (role === 'user') return <div className="whitespace-pre-wrap font-medium">{content}</div>;
 
-  // Split content by headers
   const sections = content.split(/(?=### )/);
 
   return (
@@ -16,67 +17,79 @@ const MessageRenderer: React.FC<{ content: string; role: 'user' | 'model' }> = (
         const title = isHeader ? section.split('\n')[0].replace('### ', '') : '';
         const body = isHeader ? section.split('\n').slice(1).join('\n') : section;
 
-        // Custom styling for specific medical sections
-        if (title.includes('INSTANT SOLUTIONS')) {
+        if (title.includes('BLOOD WORK OVERVIEW') || title.includes('BIOMARKER ANALYSIS')) {
           return (
-            <div key={idx} className="bg-emerald-50 border border-emerald-100 rounded-2xl p-5 shadow-sm border-l-4 border-l-emerald-500 transition-all hover:bg-emerald-100/50">
-              <div className="flex items-center gap-2 mb-3 text-emerald-700 font-bold uppercase tracking-wider text-xs">
-                <i className="fas fa-hand-holding-medical text-emerald-500"></i>
-                {title}
-              </div>
-              <div className="text-emerald-900 text-sm leading-relaxed prose prose-emerald prose-sm max-w-none">
-                {body.split('\n').filter(l => l.trim()).map((line, lIdx) => (
-                  <p key={lIdx} className="mb-1">{line}</p>
-                ))}
-              </div>
-            </div>
-          );
-        }
-
-        if (title.includes('POTENTIAL CAUSES')) {
-          return (
-            <div key={idx} className="bg-blue-50 border border-blue-100 rounded-2xl p-5 shadow-sm border-l-4 border-l-blue-500">
+            <div key={idx} className="bg-blue-50 border border-blue-100 rounded-2xl p-5 shadow-sm border-l-4 border-l-blue-600">
               <div className="flex items-center gap-2 mb-3 text-blue-700 font-bold uppercase tracking-wider text-xs">
                 <i className="fas fa-microscope text-blue-500"></i>
                 {title}
               </div>
-              <div className="text-blue-900 text-sm leading-relaxed">
+              <div className="text-slate-800 text-sm leading-relaxed overflow-x-auto">
                 {body.split('\n').filter(l => l.trim()).map((line, lIdx) => (
-                  <p key={lIdx} className="mb-1">{line}</p>
+                  <div key={lIdx} className="py-1.5 border-b border-blue-100/50 last:border-0 font-mono text-[13px]">
+                    {line.startsWith('- ') || line.startsWith('* ') ? line.substring(2) : line}
+                  </div>
                 ))}
               </div>
             </div>
           );
         }
 
-        if (title.includes('EMERGENCY')) {
+        if (title.includes('FINDINGS & ANOMALIES')) {
           return (
-            <div key={idx} className="bg-rose-50 border border-rose-200 rounded-2xl p-5 shadow-md border-l-4 border-l-rose-600 animate-pulse-slow">
-              <div className="flex items-center gap-2 mb-3 text-rose-700 font-black uppercase tracking-wider text-xs">
-                <i className="fas fa-exclamation-triangle text-rose-600"></i>
+            <div key={idx} className="bg-amber-50 border border-amber-200 rounded-2xl p-5 shadow-sm border-l-4 border-l-amber-600">
+              <div className="flex items-center gap-2 mb-3 text-amber-800 font-bold uppercase tracking-wider text-xs">
+                <i className="fas fa-vial-circle-check text-amber-600"></i>
                 {title}
               </div>
-              <div className="text-rose-950 text-sm font-bold leading-relaxed">
+              <div className="text-amber-900 text-sm font-semibold leading-relaxed">
                 {body}
               </div>
             </div>
           );
         }
 
-        if (title.includes('NEXT STEPS') || section.includes('hospital') || section.includes('appointment')) {
+        if (title.includes('VISUAL OBSERVATIONS')) {
           return (
-            <div key={idx} className="bg-slate-50 border border-slate-200 rounded-2xl p-5 shadow-sm">
-               {isHeader && (
-                <div className="flex items-center gap-2 mb-3 text-slate-700 font-bold uppercase tracking-wider text-xs">
-                  <i className="fas fa-hospital-user text-blue-600"></i>
-                  {title}
+            <div key={idx} className="bg-indigo-50 border border-indigo-100 rounded-2xl p-5 shadow-sm border-l-4 border-l-indigo-500">
+              <div className="flex items-center gap-2 mb-3 text-indigo-700 font-bold uppercase tracking-wider text-xs">
+                <i className="fas fa-eye text-indigo-500"></i>
+                {title}
+              </div>
+              <div className="text-indigo-900 text-sm leading-relaxed">
+                {body.split('\n').filter(l => l.trim()).map((line, lIdx) => (
+                  <p key={lIdx} className="mb-1">{line}</p>
+                ))}
+              </div>
+            </div>
+          );
+        }
+
+        if (title.includes('MILD OTC SUGGESTIONS')) {
+          return (
+            <div key={idx} className="bg-emerald-50 border border-emerald-100 rounded-2xl p-5 shadow-sm border-l-4 border-l-emerald-500">
+              <div className="flex items-center gap-2 mb-3 text-emerald-700 font-bold uppercase tracking-wider text-xs">
+                <i className="fas fa-pills text-emerald-500"></i>
+                {title}
+              </div>
+              <div className="text-emerald-900 text-sm leading-relaxed">
+                {body}
+                <div className="mt-4 p-3 bg-white/50 rounded-xl border border-emerald-200/50 text-[10px] text-emerald-600 font-bold italic uppercase tracking-tighter">
+                  Caution: Consult a pharmacist before use.
                 </div>
-               )}
-               <div className="text-slate-800 text-sm leading-relaxed">
-                  {body.split('\n').map((line, lIdx) => (
-                    <p key={lIdx} className="mb-1">{line}</p>
-                  ))}
-               </div>
+              </div>
+            </div>
+          );
+        }
+
+        if (title.includes('EMERGENCY') || title.includes('WARNINGS')) {
+          return (
+            <div key={idx} className="bg-rose-50 border border-rose-200 rounded-2xl p-5 shadow-md border-l-4 border-l-rose-600">
+              <div className="flex items-center gap-2 mb-3 text-rose-700 font-black uppercase tracking-wider text-xs">
+                <i className="fas fa-exclamation-triangle text-rose-600"></i>
+                {title}
+              </div>
+              <div className="text-rose-950 text-sm font-bold leading-relaxed">{body}</div>
             </div>
           );
         }
@@ -93,15 +106,21 @@ const MessageRenderer: React.FC<{ content: string; role: 'user' | 'model' }> = (
 };
 
 const ChatInterface: React.FC = () => {
-  const [messages, setMessages] = useState<Message[]>([]);
+  const [messages, setMessages] = useState<Message[]>(() => {
+    const saved = localStorage.getItem(STORAGE_KEY);
+    return saved ? JSON.parse(saved) : [];
+  });
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
+  const [analysisMode, setAnalysisMode] = useState<'symptom' | 'blood' | 'chat'>('chat');
+  
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const scrollToBottom = () => messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   useEffect(() => scrollToBottom(), [messages]);
+  useEffect(() => localStorage.setItem(STORAGE_KEY, JSON.stringify(messages)), [messages]);
 
   const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -112,15 +131,20 @@ const ChatInterface: React.FC = () => {
     }
   };
 
+  const triggerUpload = (mode: 'symptom' | 'blood') => {
+    setAnalysisMode(mode);
+    fileInputRef.current?.click();
+  };
+
   const handleSend = async (overridePrompt?: string) => {
     const textToSend = overridePrompt || input;
     if (!textToSend.trim() && !selectedImage) return;
 
     const userMessage: Message = {
       role: 'user',
-      content: textToSend,
+      content: textToSend || (analysisMode === 'blood' ? "Analyzing blood results..." : "Analyzing visual symptoms..."),
       image: selectedImage || undefined,
-      timestamp: new Date(),
+      timestamp: new Date().toISOString(),
     };
 
     setMessages((prev) => [...prev, userMessage]);
@@ -131,9 +155,10 @@ const ChatInterface: React.FC = () => {
       let response;
       if (selectedImage) {
         const base64 = selectedImage.split(',')[1];
-        const text = await analyzeSymptomImage(textToSend || "Analyze this image and suggest hospitals if serious.", base64);
-        response = { text, sources: [] };
+        const result = await analyzeSymptomImage(textToSend, base64, analysisMode === 'blood' ? 'blood' : 'symptom');
+        response = { text: result.text, sources: result.sources };
         setSelectedImage(null);
+        setAnalysisMode('chat');
       } else {
         response = await chatWithSearch(textToSend, messages);
       }
@@ -142,13 +167,13 @@ const ChatInterface: React.FC = () => {
         role: 'model',
         content: response.text,
         sources: response.sources,
-        timestamp: new Date(),
+        timestamp: new Date().toISOString(),
       }]);
     } catch (error) {
       setMessages((prev) => [...prev, {
         role: 'model',
-        content: "### ⚠️ CONNECTIVITY ALERT\nI'm unable to reach the medical database. If you have severe symptoms, please visit the nearest hospital immediately.",
-        timestamp: new Date(),
+        content: "### ⚠️ CONNECTIVITY ALERT\nI'm unable to reach the medical database. Please try again or seek professional help.",
+        timestamp: new Date().toISOString(),
       }]);
     } finally {
       setIsLoading(false);
@@ -165,19 +190,19 @@ const ChatInterface: React.FC = () => {
             </div>
             <h2 className="text-5xl font-black text-slate-900 mb-6 tracking-tighter">Clinical Intelligence <span className="text-blue-600">Elite</span></h2>
             <p className="text-slate-500 max-w-xl mb-12 text-xl leading-relaxed font-medium">
-              Immediate symptom analysis, local hospital scouting, and appointment booking. Secure and precise.
+              Precision health analysis for symptoms and laboratory results.
             </p>
             
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 w-full max-w-2xl px-4">
               {[
-                { label: "Emergency Near Me", sub: "Instant Hospital Search", icon: "fa-truck-medical", color: "text-rose-600" },
-                { label: "Book Appointment", sub: "Confirm at Local Clinic", icon: "fa-clock", color: "text-emerald-600" },
-                { label: "Chest Tightness", sub: "Priority Severity Check", icon: "fa-heart-pulse", color: "text-orange-600" },
-                { label: "Identify Rash", sub: "Upload & Analyze", icon: "fa-camera-retro", color: "text-indigo-600" }
+                { label: "Analyze Blood Results", sub: "Scan Lab Reports", icon: "fa-vial", color: "text-blue-600", action: () => triggerUpload('blood') },
+                { label: "Scan Symptom Photo", sub: "Analyze Rash or Cuts", icon: "fa-camera-viewfinder", color: "text-indigo-600", action: () => triggerUpload('symptom') },
+                { label: "Find 24/7 Pharmacy", sub: "Locate Nearby Stores", icon: "fa-map-location-dot", color: "text-emerald-600", action: () => handleSend("Find 24/7 pharmacies near me") },
+                { label: "Emergency Help", sub: "Instant Hospital Search", icon: "fa-truck-medical", color: "text-rose-600", action: () => handleSend("Emergency rooms near me") }
               ].map(chip => (
                 <button 
                   key={chip.label}
-                  onClick={() => handleSend(chip.label)}
+                  onClick={chip.action}
                   className="p-6 bg-white border border-slate-100 rounded-3xl text-left shadow-sm hover:shadow-2xl hover:border-blue-300 transition-all group flex items-start gap-4 active:scale-95"
                 >
                   <div className={`w-12 h-12 rounded-2xl bg-slate-50 flex items-center justify-center ${chip.color} text-xl group-hover:scale-110 transition-transform shadow-inner`}>
@@ -202,27 +227,15 @@ const ChatInterface: React.FC = () => {
             }`}>
               {msg.image && (
                 <div className="mb-6 rounded-3xl overflow-hidden border-4 border-slate-50 shadow-2xl group relative">
-                  <img src={msg.image} alt="Symptom" className="max-h-96 w-full object-cover transition-transform group-hover:scale-105" />
-                  <div className="absolute top-4 right-4 bg-black/50 backdrop-blur-md text-white px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest">Symptom Evidence</div>
-                </div>
-              )}
-              <MessageRenderer content={msg.content} role={msg.role} />
-              
-              {msg.sources && msg.sources.length > 0 && (
-                <div className="mt-8 pt-6 border-t border-slate-50">
-                  <span className="text-[10px] font-black text-slate-400 uppercase tracking-[0.4em] block mb-4">Location & Documentation Nodes</span>
-                  <div className="flex flex-wrap gap-2">
-                    {msg.sources.map((source, sIdx) => (
-                      <a key={sIdx} href={source.uri} target="_blank" rel="noopener noreferrer" className="text-[11px] bg-slate-50 text-slate-600 px-5 py-2.5 rounded-2xl border border-slate-200 hover:bg-blue-600 hover:text-white hover:border-blue-600 transition-all font-bold flex items-center gap-2 group">
-                        <i className={source.uri.includes('maps') ? "fas fa-directions text-rose-500 group-hover:text-white" : "fas fa-link"}></i>
-                        {source.title.length > 35 ? source.title.substring(0, 35) + '...' : source.title}
-                      </a>
-                    ))}
+                  <img src={msg.image} alt="Evidence" className="max-h-96 w-full object-cover" />
+                  <div className="absolute top-4 right-4 bg-black/50 backdrop-blur-md text-white px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest">
+                    Clinical Data Node
                   </div>
                 </div>
               )}
+              <MessageRenderer content={msg.content} role={msg.role} />
               <div className={`mt-4 text-[10px] font-black uppercase tracking-[0.2em] ${msg.role === 'user' ? 'text-slate-500' : 'text-slate-300'}`}>
-                {msg.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} • Secure Clinical Handshake
+                {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} • Clinical Signature
               </div>
             </div>
           </div>
@@ -230,15 +243,12 @@ const ChatInterface: React.FC = () => {
         {isLoading && (
           <div className="flex justify-start">
             <div className="bg-white border border-slate-100 rounded-[2.5rem] p-8 shadow-2xl shadow-slate-100 flex items-center gap-6">
-              <div className="relative w-10 h-10">
-                <div className="absolute inset-0 bg-blue-500 rounded-full opacity-20 animate-ping"></div>
-                <div className="relative w-10 h-10 bg-blue-600 rounded-full flex items-center justify-center text-white text-xs">
-                    <i className="fas fa-network-wired animate-pulse"></i>
-                </div>
+              <div className="relative w-10 h-10 bg-indigo-600 rounded-full flex items-center justify-center text-white text-xs animate-pulse">
+                  <i className="fas fa-microscope"></i>
               </div>
               <div>
-                <span className="text-sm font-black text-slate-700 uppercase tracking-[0.3em] block">Co-Pilot Reasoning</span>
-                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Scouting nearby hospitals...</span>
+                <span className="text-sm font-black text-slate-700 uppercase tracking-[0.3em] block">Diagnostic Core Active</span>
+                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Processing medical documentation...</span>
               </div>
             </div>
           </div>
@@ -250,24 +260,27 @@ const ChatInterface: React.FC = () => {
         <div className="max-w-4xl mx-auto flex flex-col gap-6">
           <div className="flex items-center gap-4">
              <input type="file" ref={fileInputRef} onChange={handleImageSelect} accept="image/*" className="hidden" />
-             <button onClick={() => fileInputRef.current?.click()} className="w-16 h-16 bg-slate-50 text-slate-400 hover:text-blue-600 hover:bg-white hover:shadow-2xl rounded-2xl transition-all flex items-center justify-center text-xl shrink-0 group">
-                <i className="fas fa-camera-viewfinder group-hover:scale-110 transition-transform"></i>
-             </button>
+             <div className="flex gap-2">
+                <button onClick={() => triggerUpload('symptom')} className="w-14 h-14 rounded-2xl bg-slate-50 text-slate-400 hover:text-indigo-600 hover:bg-white hover:shadow-lg transition-all flex items-center justify-center text-lg shadow-inner">
+                  <i className="fas fa-camera"></i>
+                </button>
+                <button onClick={() => triggerUpload('blood')} className="w-14 h-14 rounded-2xl bg-slate-50 text-slate-400 hover:text-blue-600 hover:bg-white hover:shadow-lg transition-all flex items-center justify-center text-lg shadow-inner">
+                  <i className="fas fa-vial"></i>
+                </button>
+             </div>
              
              <div className="flex-1 relative flex items-center">
                 <input 
                   value={input}
                   onChange={(e) => setInput(e.target.value)}
                   onKeyDown={(e) => e.key === 'Enter' && handleSend()}
-                  placeholder="Describe your symptoms or ask to book..."
-                  className="w-full h-16 pl-8 pr-16 rounded-[1.75rem] bg-slate-50 border-none focus:ring-4 focus:ring-blue-500/10 text-lg font-semibold outline-none transition-all placeholder:text-slate-300 shadow-inner"
+                  placeholder={selectedImage ? (analysisMode === 'blood' ? "Any specific concerns about these results?" : "Describe the symptom's sensation...") : "Message MediGenie..."}
+                  className="w-full h-14 pl-8 pr-16 rounded-[1.5rem] bg-slate-50 border-none focus:ring-4 focus:ring-blue-500/10 text-lg font-semibold outline-none transition-all placeholder:text-slate-300 shadow-inner"
                 />
                 <button 
                   onClick={() => handleSend()}
                   disabled={(!input.trim() && !selectedImage) || isLoading}
-                  className={`absolute right-3 w-10 h-10 rounded-xl transition-all flex items-center justify-center ${
-                    (!input.trim() && !selectedImage) || isLoading ? 'text-slate-200' : 'bg-blue-600 text-white shadow-xl shadow-blue-200 hover:scale-110 active:scale-95'
-                  }`}
+                  className="absolute right-3 w-10 h-10 rounded-xl bg-blue-600 text-white shadow-xl hover:scale-110 active:scale-95 disabled:opacity-50"
                 >
                   <i className="fas fa-paper-plane"></i>
                 </button>
@@ -275,32 +288,19 @@ const ChatInterface: React.FC = () => {
           </div>
           
           {selectedImage && (
-            <div className="flex items-center gap-5 p-4 bg-blue-50/50 rounded-[2rem] border border-blue-100 animate-in slide-in-from-bottom-4 shadow-sm">
-               <div className="w-20 h-20 rounded-2xl overflow-hidden shrink-0 border-4 border-white shadow-lg">
+            <div className="flex items-center gap-5 p-4 bg-indigo-50/50 rounded-[2rem] border border-indigo-100 animate-in slide-in-from-bottom-4 shadow-sm">
+               <div className="w-16 h-16 rounded-2xl overflow-hidden shrink-0 border-4 border-white shadow-lg">
                   <img src={selectedImage} className="w-full h-full object-cover" />
                </div>
                <div>
-                  <h5 className="font-black text-blue-900 text-sm tracking-tight">Clinical Evidence Loaded</h5>
-                  <p className="text-[11px] text-blue-600 font-bold uppercase tracking-[0.2em] mt-1">Multi-modal analysis ready</p>
+                  <h5 className="font-black text-indigo-900 text-sm tracking-tight">{analysisMode === 'blood' ? 'Blood Report Attached' : 'Symptom Snapshot Attached'}</h5>
+                  <p className="text-[10px] text-indigo-600 font-bold uppercase tracking-[0.2em] mt-1">Diagnostic Vision Pipeline Ready</p>
                </div>
-               <button onClick={() => setSelectedImage(null)} className="ml-auto w-12 h-12 flex items-center justify-center text-blue-300 hover:text-rose-600 transition-colors bg-white rounded-2xl shadow-sm border border-slate-100 active:scale-90">
-                  <i className="fas fa-trash-alt"></i>
+               <button onClick={() => setSelectedImage(null)} className="ml-auto w-10 h-10 flex items-center justify-center text-rose-300 hover:text-rose-600 transition-colors bg-white rounded-xl shadow-sm border border-slate-100">
+                  <i className="fas fa-times"></i>
                </button>
             </div>
           )}
-          
-          <div className="flex justify-between items-center px-6">
-             <div className="flex items-center gap-3 text-[10px] text-slate-400 font-black uppercase tracking-[0.3em]">
-                <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-                Location Verified
-             </div>
-             <p className="text-[9px] text-slate-300 font-bold text-center uppercase tracking-[0.4em] italic opacity-60">
-                Hospital Network Synchronized
-             </p>
-             <div className="flex items-center gap-3 text-[10px] text-slate-400 font-black uppercase tracking-[0.3em]">
-                Tier 1 Node <i className="fas fa-shield-halved text-blue-400"></i>
-             </div>
-          </div>
         </div>
       </div>
     </div>
