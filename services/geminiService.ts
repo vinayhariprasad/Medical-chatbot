@@ -1,4 +1,3 @@
-
 import { GoogleGenAI, Type, FunctionDeclaration } from "@google/genai";
 
 export const getGeminiClient = () => {
@@ -46,7 +45,7 @@ Your task is to analyze blood test reports (CBC, CMP, Lipid Panel, Thyroid, etc.
    - ### 💡 LIFESTYLE & DIETARY RECOMMENDATIONS
    - ### 🏥 RECOMMENDED MEDICAL CONSULTATION
 
-DISCLAIMER: This is an AI-assisted analysis of laboratory data. It is NOT a diagnostic report. Always review these results with your primary care physician or a specialist.`;
+DISCLAIMER: This is an AI-assisted analysis of laboratory data. Always review results with your doctor.`;
 
 const bookAppointmentDeclaration: FunctionDeclaration = {
   name: 'bookAppointment',
@@ -72,32 +71,18 @@ export const chatWithSearch = async (prompt: string, history: any[] = []) => {
     userLocation = { latitude: position.coords.latitude, longitude: position.coords.longitude };
   } catch (e) {}
 
+  // CRITICAL: Google Maps grounding is only supported in Gemini 2.5 series models.
+  // Rule: tools: googleMaps may be used with googleSearch, but not with any other tools.
+  // Removed functionDeclarations to comply with Google Maps tool constraints.
   const response = await ai.models.generateContent({
-    model: "gemini-3-pro-preview",
+    model: "gemini-2.5-flash",
     contents: prompt,
     config: {
-      tools: [{ googleSearch: {} }, { googleMaps: {} }, { functionDeclarations: [bookAppointmentDeclaration] }],
+      tools: [{ googleSearch: {} }, { googleMaps: {} }],
       toolConfig: userLocation ? { retrievalConfig: { latLng: userLocation } } : undefined,
       systemInstruction: MEDICAL_SYSTEM_INSTRUCTION
     },
   });
-
-  if (response.functionCalls && response.functionCalls.length > 0) {
-    const call = response.functionCalls[0];
-    if (call.name === 'bookAppointment') {
-      const result = `SUCCESS: Appointment confirmed at ${call.args.hospitalName} for ${call.args.preferredDateTime}.`;
-      const followUp = await ai.models.generateContent({
-        model: "gemini-3-pro-preview",
-        contents: [
-          { role: 'user', parts: [{ text: prompt }] },
-          { role: 'model', parts: [{ functionCall: call }] },
-          { role: 'user', parts: [{ functionResponse: { name: call.name, response: { result } } }] }
-        ],
-        config: { systemInstruction: MEDICAL_SYSTEM_INSTRUCTION }
-      });
-      return { text: followUp.text, sources: [] };
-    }
-  }
 
   const sources = response.candidates?.[0]?.groundingMetadata?.groundingChunks?.map((chunk: any) => {
     if (chunk.web) return { title: chunk.web.title, uri: chunk.web.uri };
@@ -105,6 +90,7 @@ export const chatWithSearch = async (prompt: string, history: any[] = []) => {
     return null;
   }).filter(Boolean) || [];
 
+  // Directly access the .text property from the response object
   return { text: response.text, sources };
 };
 
@@ -112,8 +98,15 @@ export const analyzeSymptomImage = async (prompt: string, base64Image: string, m
   const ai = getGeminiClient();
   const instruction = mode === 'blood' ? BLOOD_ANALYSIS_INSTRUCTION : VISUAL_ANALYSIS_INSTRUCTION;
   
+  // Use Gemini 3 for complex data extraction (Blood), 2.5 for general visuals
+  const modelToUse = mode === 'blood' ? "gemini-3-pro-image-preview" : "gemini-2.5-flash-image";
+
+  // Rule: Upgrade to gemini-3-pro-image-preview if requesting real-time information using googleSearch.
+  // Do not use googleSearch tool with gemini-2.5-flash-image.
+  const tools = modelToUse === 'gemini-3-pro-image-preview' ? [{ googleSearch: {} }] : [];
+
   const response = await ai.models.generateContent({
-    model: "gemini-3-pro-image-preview",
+    model: modelToUse,
     contents: {
       parts: [
         { inlineData: { data: base64Image, mimeType: "image/jpeg" } },
@@ -122,17 +115,11 @@ export const analyzeSymptomImage = async (prompt: string, base64Image: string, m
     },
     config: {
       systemInstruction: instruction,
-      tools: [{ googleSearch: {} }] 
+      tools: tools
     }
   });
 
-  let text = "";
   const sources: any[] = [];
-  if (response.candidates?.[0]?.content?.parts) {
-    for (const part of response.candidates[0].content.parts) {
-      if (part.text) text += part.text;
-    }
-  }
   const groundingChunks = response.candidates?.[0]?.groundingMetadata?.groundingChunks;
   if (groundingChunks) {
     groundingChunks.forEach((chunk: any) => {
@@ -140,29 +127,44 @@ export const analyzeSymptomImage = async (prompt: string, base64Image: string, m
     });
   }
 
-  return { text, sources };
+  // Directly access the .text property from the response object
+  return { text: response.text, sources };
 };
 
 export function encode(bytes: Uint8Array) {
   let binary = '';
-  for (let i = 0; i < bytes.byteLength; i++) binary += String.fromCharCode(bytes[i]);
+  const len = bytes.byteLength;
+  for (let i = 0; i < len; i++) {
+    binary += String.fromCharCode(bytes[i]);
+  }
   return btoa(binary);
 }
 
 export function decode(base64: string) {
   const binaryString = atob(base64);
-  const bytes = new Uint8Array(binaryString.length);
-  for (let i = 0; i < binaryString.length; i++) bytes[i] = binaryString.charCodeAt(i);
+  const len = binaryString.length;
+  const bytes = new Uint8Array(len);
+  for (let i = 0; i < len; i++) {
+    bytes[i] = binaryString.charCodeAt(i);
+  }
   return bytes;
 }
 
-export async function decodeAudioData(data: Uint8Array, ctx: AudioContext, sampleRate: number, numChannels: number): Promise<AudioBuffer> {
+export async function decodeAudioData(
+  data: Uint8Array,
+  ctx: AudioContext,
+  sampleRate: number,
+  numChannels: number,
+): Promise<AudioBuffer> {
   const dataInt16 = new Int16Array(data.buffer);
   const frameCount = dataInt16.length / numChannels;
   const buffer = ctx.createBuffer(numChannels, frameCount, sampleRate);
+
   for (let channel = 0; channel < numChannels; channel++) {
     const channelData = buffer.getChannelData(channel);
-    for (let i = 0; i < frameCount; i++) channelData[i] = dataInt16[i * numChannels + channel] / 32768.0;
+    for (let i = 0; i < frameCount; i++) {
+      channelData[i] = dataInt16[i * numChannels + channel] / 32768.0;
+    }
   }
   return buffer;
 }

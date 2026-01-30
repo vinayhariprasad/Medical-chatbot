@@ -169,10 +169,17 @@ const ChatInterface: React.FC = () => {
         sources: response.sources,
         timestamp: new Date().toISOString(),
       }]);
-    } catch (error) {
+    } catch (error: any) {
+      console.error(error);
+      const errorMsg = error.message || "";
+      
+      if (errorMsg.includes("Requested entity was not found") && window.aistudio) {
+          window.aistudio.openSelectKey();
+      }
+
       setMessages((prev) => [...prev, {
         role: 'model',
-        content: "### ⚠️ CONNECTIVITY ALERT\nI'm unable to reach the medical database. Please try again or seek professional help.",
+        content: "### ⚠️ CONNECTION RESET\nYour Clinical Key session has expired or the model tool configuration was invalid. Please re-select your key or try again.\n\n" + (errorMsg || "Unknown diagnostic error."),
         timestamp: new Date().toISOString(),
       }]);
     } finally {
@@ -190,7 +197,7 @@ const ChatInterface: React.FC = () => {
             </div>
             <h2 className="text-5xl font-black text-slate-900 mb-6 tracking-tighter">Clinical Intelligence <span className="text-blue-600">Elite</span></h2>
             <p className="text-slate-500 max-w-xl mb-12 text-xl leading-relaxed font-medium">
-              Precision health analysis for symptoms and laboratory results.
+              Precision health analysis for symptoms and laboratory results. Powered by 2.5 & 3.0 Series Intelligence.
             </p>
             
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 w-full max-w-2xl px-4">
